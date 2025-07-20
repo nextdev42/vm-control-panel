@@ -36,7 +36,6 @@ def network_test():
             result = "Tafadhali andika IP au hostname."
     return render_template("network_test.html", result=result)
 
-
 @main.route("/set_ip", methods=["GET", "POST"])
 def set_ip():
     if request.method == "POST":
