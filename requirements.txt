@@ -1,5 +1,4 @@
 # requirements.txt
 Flask==2.3.2
-Flask-Bootstrap==3.3.7.1
 netifaces
 subprocess.run
