@@ -25,6 +25,10 @@ RUN pip3 install --upgrade pip
 COPY requirements.txt .
 RUN pip3 install -r requirements.txt
 
+# Enable passwordless sudo for gitpod
+RUN echo 'gitpod ALL=(ALL) NOPASSWD:ALL' > /etc/sudoers.d/gitpod
+
+
 # Copy the rest of the app
 COPY . .
 
