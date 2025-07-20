@@ -2,6 +2,20 @@
 
 # setup.sh
 
+#!/bin/bash
+# Create eth1 dummy interface if it doesn't exist
+if ! ip link show eth1 &>/dev/null; then
+  sudo ip link add eth1 type dummy
+  sudo ip link set eth1 up
+fi
+
+# Enable IP forwarding for NAT
+sudo sysctl -w net.ipv4.ip_forward=1
+
+# Start dnsmasq if needed
+sudo systemctl restart dnsmasq || true
+
+
 echo "[*] Running initial setup..."
 
 # Enable IP forwarding
