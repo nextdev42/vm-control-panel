@@ -1,0 +1,10 @@
+image:
+  file: .gitpod.Dockerfile
+
+tasks:
+  - init: ./setup.sh
+  - command: python run.py
+
+ports:
+  - port: 5000
+    onOpen: open-preview
