@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Ongeza Mtumiaji - VM Control Panel{% endblock %}
+
+{% block content %}
+<h1>Ongeza Mtumiaji Mpya</h1>
+
+<form method="post">
+    <div class="mb-3">
+        <label for="username" class="form-label">Jina la Mtumiaji</label>
+        <input type="text" class="form-control" id="username" name="username" placeholder="Andika jina" required />
+    </div>
+
+    <div class="mb-3">
+        <label for="password" class="form-label">Nenosiri</label>
+        <input type="password" class="form-control" id="password" name="password" placeholder="Andika nenosiri" required />
+    </div>
+
+    <button type="submit" class="btn btn-success">Ongeza Mtumiaji</button>
+</form>
+
+{% endblock %}
