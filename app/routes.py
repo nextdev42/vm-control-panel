@@ -5,7 +5,6 @@ main = Blueprint("main", __name__)
 
 def get_interfaces():
     try:
-        # Pata list ya interfaces isipokuwa loopback (lo)
         result = subprocess.run(['ip', '-o', 'addr', 'show'], capture_output=True, text=True, check=True)
         lines = result.stdout.strip().split('\n')
         interfaces = {}
@@ -113,35 +112,6 @@ def add_user():
 
     return render_template("add_user.html")
 
-import subprocess
-from flask import Blueprint, render_template, request, redirect, url_for, flash
-
-main = Blueprint("main", __name__)
-
-def get_interfaces():
-    try:
-        result = subprocess.run(['ip', '-o', 'addr', 'show'], capture_output=True, text=True, check=True)
-        lines = result.stdout.strip().split('\n')
-        interfaces = {}
-        for line in lines:
-            parts = line.split()
-            iface = parts[1]
-            if iface == "lo":
-                continue
-            ip = parts[3] if len(parts) > 3 and '/' in parts[3] else None
-            interfaces[iface] = ip or "No IP assigned"
-        return interfaces
-    except subprocess.CalledProcessError:
-        return {}
-
-@main.route("/")
-def index():
-    interfaces = get_interfaces()
-    return render_template("index.html", interfaces=interfaces)
-
-# ... your other routes like set_ip, add_user, toggle_dhcp, network_test here ...
-
-# New route to toggle NAT
 @main.route("/toggle_nat", methods=["GET", "POST"])
 def toggle_nat():
     if request.method == "POST":
@@ -160,19 +130,19 @@ def toggle_nat():
             if action == "enable":
                 # Enable IP forwarding
                 subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"], check=True)
-                # Setup NAT with iptables masquerade on eth0 (assume eth0 is public)
+                # Setup NAT with iptables masquerade on eth0 (assume eth0 is public interface)
                 subprocess.run([
                     "sudo", "iptables", "-t", "nat", "-A", "POSTROUTING",
                     "-o", "eth0", "-j", "MASQUERADE"
                 ], check=True)
                 flash(f"NAT imewezeshwa kwa interface {iface}.", "success")
             else:
-                # Disable NAT (flush masquerade rules)
+                # Disable NAT (remove masquerade rule)
                 subprocess.run([
                     "sudo", "iptables", "-t", "nat", "-D", "POSTROUTING",
                     "-o", "eth0", "-j", "MASQUERADE"
                 ], check=True)
-                # Optionally disable IP forwarding
+                # Disable IP forwarding
                 subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=0"], check=True)
                 flash(f"NAT imezimwa kwa interface {iface}.", "success")
         except subprocess.CalledProcessError as e:
@@ -180,6 +150,5 @@ def toggle_nat():
 
         return redirect(url_for("main.index"))
 
-    # GET method: show NAT toggle form
     interfaces = get_interfaces()
     return render_template("toggle_nat.html", interfaces=interfaces)
