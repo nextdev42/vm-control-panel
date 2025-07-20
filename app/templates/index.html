@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+
+{% block title %}Home - VM Control Panel{% endblock %}
+
+{% block content %}
+<h1>Karibu kwenye VM Control Panel</h1>
+
+<h3>Network Interfaces na IP Addresses</h3>
+<table class="table table-bordered">
+    <thead>
+        <tr>
+            <th>Interface</th>
+            <th>IP Address</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for iface, ip in interfaces.items() %}
+        <tr>
+            <td>{{ iface }}</td>
+            <td>{{ ip }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="2">Hakuna interfaces zinazoonekana.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<form method="post" action="{{ url_for('main.toggle_dhcp') }}">
+    <button type="submit" name="action" value="enable" class="btn btn-success">Washusha DHCP (Start dnsmasq)</button>
+    <button type="submit" name="action" value="disable" class="btn btn-danger">Zima DHCP (Stop dnsmasq)</button>
+</form>
+
+{% endblock %}
