@@ -2,7 +2,8 @@
 
 # setup.sh
 
-#!/bin/bash
+echo "[*] Checking eth1 dummy interface..."
+
 # Create eth1 dummy interface if it doesn't exist
 if ! ip link show eth1 &>/dev/null; then
   sudo ip link add eth1 type dummy
@@ -10,32 +11,27 @@ if ! ip link show eth1 &>/dev/null; then
 fi
 
 # Enable IP forwarding for NAT
+echo "[*] Enabling IP forwarding..."
 sudo sysctl -w net.ipv4.ip_forward=1
 
-# Start dnsmasq if needed
-sudo systemctl restart dnsmasq || true
-
-
-echo "[*] Running initial setup..."
-
-# Enable IP forwarding
-echo 1 > /proc/sys/net/ipv4/ip_forward
-
 # Set up default dnsmasq config
-cat <<EOF > /etc/dnsmasq.conf
+echo "[*] Configuring dnsmasq..."
+cat <<EOF | sudo tee /etc/dnsmasq.conf
 interface=eth1
 dhcp-range=192.168.56.10,192.168.56.100,12h
 EOF
 
 # Restart dnsmasq
-systemctl restart dnsmasq || service dnsmasq restart
+echo "[*] Restarting dnsmasq..."
+sudo systemctl restart dnsmasq || sudo service dnsmasq restart || true
 
-# Add webadmin user with sudo privileges (example)
+# Add webadmin user with sudo privileges
 if ! id -u webadmin >/dev/null 2>&1; then
-  useradd -m -s /bin/bash webadmin
-  echo 'webadmin:nextdev123' | chpasswd
-  usermod -aG sudo webadmin
-  echo 'webadmin ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
+  echo "[*] Creating webadmin user..."
+  sudo useradd -m -s /bin/bash webadmin
+  echo 'webadmin:nextdev123' | sudo chpasswd
+  sudo usermod -aG sudo webadmin
+  echo 'webadmin ALL=(ALL) NOPASSWD:ALL' | sudo tee -a /etc/sudoers
 fi
 
 echo "[*] Setup completed!"
