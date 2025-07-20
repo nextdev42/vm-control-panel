@@ -1,8 +1,9 @@
 # .gitpod.Dockerfile
 FROM python:3.10-slim
 
-# Install necessary system packages
+# Install system dependencies, including git
 RUN apt-get update && apt-get install -y \
+    git \
     iproute2 \
     net-tools \
     dnsmasq \
@@ -16,16 +17,16 @@ RUN apt-get update && apt-get install -y \
 # Set working directory
 WORKDIR /workspace/app
 
-# Ensure pip is upgraded first
+# Upgrade pip
 RUN python3 -m ensurepip --upgrade
 RUN pip3 install --upgrade pip
 
-# Copy requirements and install
+# Copy and install Python dependencies
 COPY requirements.txt .
 RUN pip3 install -r requirements.txt
 
-# Copy the full project
+# Copy the rest of the app
 COPY . .
 
-# Expose default port
+# Expose Flask port
 EXPOSE 5000
