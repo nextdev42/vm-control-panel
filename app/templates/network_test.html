@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}Jaribu Mtandao - VM Control Panel{% endblock %}
+
+{% block content %}
+<h1>Jaribu Mtandao</h1>
+
+<form method="post">
+    <div class="mb-3">
+        <label for="target" class="form-label">Ingiza IP au Domain (mfano: 8.8.8.8 au google.com)</label>
+        <input type="text" class="form-control" id="target" name="target" placeholder="Andika hapa..." required />
+    </div>
+    <button type="submit" class="btn btn-primary">Ping</button>
+</form>
+
+{% if result %}
+<hr />
+<h3>Matokeo ya Ping:</h3>
+<pre>{{ result }}</pre>
+{% endif %}
+
+{% endblock %}
