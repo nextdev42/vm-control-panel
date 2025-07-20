@@ -2,8 +2,11 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
-  - init: ./setup.sh
-  - command: python run.py
+  - name: "Initialize Project"
+    init: |
+      chmod +x setup.sh
+    command: |
+      bash setup.sh && python run.py
 
 ports:
   - port: 5000
