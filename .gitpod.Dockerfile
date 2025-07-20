@@ -1,6 +1,7 @@
+# .gitpod.Dockerfile
 FROM python:3.10-slim
 
-# Install system dependencies
+# Install necessary system packages
 RUN apt-get update && apt-get install -y \
     iproute2 \
     net-tools \
@@ -9,14 +10,22 @@ RUN apt-get update && apt-get install -y \
     iputils-ping \
     curl \
     nano \
+    python3-pip \
     && apt-get clean
 
 # Set working directory
 WORKDIR /workspace/app
 
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --upgrade pip && pip install -r requirements.txt
+# Ensure pip is upgraded first
+RUN python3 -m ensurepip --upgrade
+RUN pip3 install --upgrade pip
 
-# Copy application files (Gitpod mounts the repo later, this is for build cache)
+# Copy requirements and install
+COPY requirements.txt .
+RUN pip3 install -r requirements.txt
+
+# Copy the full project
 COPY . .
+
+# Expose default port
+EXPOSE 5000
