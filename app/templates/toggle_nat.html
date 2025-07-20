@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<h2>Kudhibiti NAT kwa eth1</h2>
+
+<form method="POST">
+  <label for="interface">Chagua Interface:</label>
+  <select name="interface" id="interface" required>
+    {% for iface in interfaces.keys() %}
+      <option value="{{ iface }}">{{ iface }}</option>
+    {% endfor %}
+  </select>
+  <br><br>
+  <label>Chagua kitendo:</label><br>
+  <input type="radio" id="enable" name="action" value="enable" required>
+  <label for="enable">Wezesha NAT</label><br>
+  <input type="radio" id="disable" name="action" value="disable" required>
+  <label for="disable">Zima NAT</label><br><br>
+
+  <button type="submit">Tuma</button>
+</form>
+
+{% endblock %}
