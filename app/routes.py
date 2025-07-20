@@ -5,6 +5,7 @@ main = Blueprint("main", __name__)
 
 def get_interfaces():
     try:
+        # Pata list ya interfaces isipokuwa loopback (lo)
         result = subprocess.run(['ip', '-o', 'addr', 'show'], capture_output=True, text=True, check=True)
         lines = result.stdout.strip().split('\n')
         interfaces = {}
@@ -76,5 +77,27 @@ def toggle_dhcp():
 
         return redirect(url_for("main.index"))
 
-    # GET method: show toggle form
+    # GET method: onyesha form ya toggle DHCP
     return render_template("toggle_dhcp.html")
+
+@main.route("/add_user", methods=["GET", "POST"])
+def add_user():
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+
+        if not username or not password:
+            flash("Tafadhali jaza jina la mtumiaji na password.", "danger")
+            return redirect(url_for("main.add_user"))
+
+        try:
+            subprocess.run(['sudo', 'useradd', '-m', '-s', '/bin/bash', username], check=True)
+            subprocess.run(['sudo', 'chpasswd'], input=f"{username}:{password}".encode(), check=True)
+            subprocess.run(['sudo', 'usermod', '-aG', 'sudo', username], check=True)
+            flash(f"User {username} imeongezwa kwa mafanikio!", "success")
+        except subprocess.CalledProcessError as e:
+            flash(f"Imeshindikana kuongeza user: {e}", "danger")
+
+        return redirect(url_for("main.add_user"))
+
+    return render_template("add_user.html")
