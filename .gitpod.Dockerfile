@@ -1,21 +1,22 @@
-# .gitpod.Dockerfile
-FROM python:3.11-slim
+FROM python:3.10-slim
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    iproute2 \
+    net-tools \
+    dnsmasq \
+    sudo \
+    iputils-ping \
+    curl \
+    nano \
+    && apt-get clean
 
 # Set working directory
 WORKDIR /workspace/app
 
-# Install required system packages
-RUN apt update && \
-    apt install -y --no-install-recommends \
-    net-tools iproute2 dnsmasq iputils-ping sudo && \
-    apt clean && rm -rf /var/lib/apt/lists/*
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-# Optional: add a non-root user (Gitpod uses root by default)
-RUN useradd -m developer && echo "developer ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
-
-# Copy requirements and install
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Default command
-CMD ["python", "run.py"]
+# Copy application files (Gitpod mounts the repo later, this is for build cache)
+COPY . .
