@@ -4,6 +4,8 @@ image:
 tasks:
   - name: "Initialize Project"
     init: |
+      sudo ip link add eth1 type dummy
+      sudo ip link set eth1 up
       chmod +x setup.sh
     command: |
       bash setup.sh && python run.py
