@@ -1,26 +1,48 @@
 {% extends "base.html" %}
 
-{% block title %}Configure IP - VM Control Panel{% endblock %}
-
 {% block content %}
-<h1>Sanidi IP kwa Interface</h1>
+<h2>Sanidi IP kwa Interface</h2>
 
-<form method="post">
-    <div class="mb-3">
-        <label for="interface" class="form-label">Chagua Interface</label>
-        <select class="form-select" id="interface" name="interface" required>
-            {% for iface, ip in interfaces.items() %}
-            <option value="{{ iface }}">{{ iface }} ({{ ip }})</option>
-            {% endfor %}
-        </select>
-    </div>
+<p><strong>Maelezo:</strong></p>
+<ul>
+  <li><code>eth0</code> ni interface yako ya intaneti (public), isibadilishwe hapa.</li>
+  <li><code>eth1</code> ni interface ya LAN, unaweza kuweka IP statiki na kuwezesha DHCP hapa.</li>
+  <li>Loopback (<code>lo</code>) haionekani kwenye orodha.</li>
+</ul>
 
-    <div class="mb-3">
-        <label for="ip" class="form-label">Andika IP Address (mfano: 192.168.1.10/24)</label>
-        <input type="text" class="form-control" id="ip" name="ip" placeholder="192.168.1.10/24" required />
-    </div>
+<form method="POST" action="{{ url_for('main.set_ip') }}">
+  <div class="mb-3">
+    <label for="interface" class="form-label">Chagua Interface</label>
+    <select name="interface" id="interface" class="form-select" required>
+      {% for iface, ip in interfaces.items() %}
+        <option value="{{ iface }}">{{ iface }} ({{ ip }})</option>
+      {% endfor %}
+    </select>
+  </div>
 
-    <button type="submit" class="btn btn-primary">Weka IP</button>
+  <div class="mb-3">
+    <label for="ip" class="form-label">Andika IP Address (mfano: 192.168.1.10/24)</label>
+    <input type="text" id="ip" name="ip" class="form-control" placeholder="192.168.1.10/24" required>
+  </div>
+
+  <button type="submit" class="btn btn-primary">Sanidi IP</button>
 </form>
 
+<hr>
+
+<h2>Kiwasha/Tizima DHCP kwa eth1</h2>
+
+<form method="POST" action="{{ url_for('main.toggle_dhcp') }}">
+  <input type="hidden" name="interface" value="eth1">
+  <div class="form-check form-check-inline">
+    <input class="form-check-input" type="radio" name="action" id="enable" value="enable" required>
+    <label class="form-check-label" for="enable">Washa DHCP</label>
+  </div>
+  <div class="form-check form-check-inline">
+    <input class="form-check-input" type="radio" name="action" id="disable" value="disable" required>
+    <label class="form-check-label" for="disable">Zima DHCP</label>
+  </div>
+  <br><br>
+  <button type="submit" class="btn btn-warning">Fanya Mabadiliko ya DHCP</button>
+</form>
 {% endblock %}
