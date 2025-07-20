@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+
+{% block title %}Configure IP - VM Control Panel{% endblock %}
+
+{% block content %}
+<h1>Sanidi IP kwa Interface</h1>
+
+<form method="post">
+    <div class="mb-3">
+        <label for="interface" class="form-label">Chagua Interface</label>
+        <select class="form-select" id="interface" name="interface" required>
+            {% for iface, ip in interfaces.items() %}
+            <option value="{{ iface }}">{{ iface }} ({{ ip }})</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="mb-3">
+        <label for="ip" class="form-label">Andika IP Address (mfano: 192.168.1.10/24)</label>
+        <input type="text" class="form-control" id="ip" name="ip" placeholder="192.168.1.10/24" required />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Weka IP</button>
+</form>
+
+{% endblock %}
