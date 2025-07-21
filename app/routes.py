@@ -123,6 +123,18 @@ def set_ip():
             message = "Interface au IP address haijatolewa."
 
     return render_template("set_ip.html", interfaces=interfaces, message=message, dhcp_running=is_dhcp_running(), dhcp_status=get_dhcp_status())
+    
+def stop_dnsmasq():
+    try:
+        output = subprocess.check_output(["ps", "aux"], text=True)
+        for line in output.splitlines():
+            if "dnsmasq" in line and "grep" not in line:
+                pid = int(line.split()[1])
+                subprocess.run(["kill", "-9", str(pid)], check=True)
+        return True
+    except Exception as e:
+        print(f"Failed to stop dnsmasq: {e}")
+        return False
 
 @main.route("/toggle_dhcp", methods=["POST"])
 def toggle_dhcp():
@@ -135,23 +147,27 @@ def toggle_dhcp():
 
     try:
         if action == "enable":
-            subprocess.run(["pkill", "dnsmasq"], stderr=subprocess.DEVNULL)
+            stop_dnsmasq()
             subprocess.run([
                 "dnsmasq",
                 "--interface=eth1",
                 "--dhcp-range=192.168.1.100,192.168.1.200,12h"
-            ])
+            ], check=True)
             flash("✅ DHCP imewezeshwa kikamilifu kwa eth1 (dnsmasq imeanzishwa).", "success")
+
         elif action == "disable":
-            subprocess.run(["pkill", "dnsmasq"])
-            flash("⚠️ DHCP imezimwa kikamilifu kwa eth1 (dnsmasq imesitishwa).", "warning")
+            if stop_dnsmasq():
+                flash("⚠️ DHCP imezimwa kikamilifu kwa eth1 (dnsmasq imesitishwa).", "warning")
+            else:
+                flash("⚠️ Hakukuwa na dnsmasq inayoendesha au ilishindwa kusitishwa.", "warning")
+
         else:
             flash("❓ Hatua haijafahamika. Tafadhali chagua 'enable' au 'disable'.", "danger")
+
     except subprocess.CalledProcessError as e:
         flash(f"❌ Hitilafu wakati wa kubadili DHCP: {e}", "danger")
 
     return redirect(url_for("main.set_ip"))
-
 @main.route("/add_user", methods=["GET", "POST"])
 def add_user():
     if request.method == "POST":
