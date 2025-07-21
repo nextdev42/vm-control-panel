@@ -57,10 +57,6 @@ def set_ip():
     # Step 1: pata interface zote (pamoja na eth1 hata kama haina IP)
     all_links = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True)
     interfaces = {}
-    def is_dhcp_running():
-    result = subprocess.run(["systemctl", "is-active", "dnsmasq"], capture_output=True, text=True)
-    return result.stdout.strip() == "active"
-
     for line in all_links.stdout.splitlines():
         parts = line.split(":")
         if len(parts) > 1:
@@ -116,6 +112,9 @@ def set_ip():
             message = "Interface au IP address haijatolewa."
 
     return render_template("set_ip.html", interfaces=interfaces, message=message)
+def is_dhcp_running():
+    result = subprocess.run(["systemctl", "is-active", "dnsmasq"], capture_output=True, text=True)
+    return result.stdout.strip() == "active"
 
 @main.route("/toggle_dhcp", methods=["POST"])
 def toggle_dhcp():
