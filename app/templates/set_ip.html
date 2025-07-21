@@ -31,6 +31,13 @@
 <hr>
 
 <h2>Kiwasha/Tizima DHCP kwa eth1</h2>
+<h5>Hali ya Sasa ya DHCP:
+  {% if dhcp_status %}
+    <span class="text-success">IMEWASHWA</span>
+  {% else %}
+    <span class="text-danger">IMEZIMWA</span>
+  {% endif %}
+</h5>
 
 <form method="POST" action="{{ url_for('main.toggle_dhcp') }}">
   <input type="hidden" name="interface" value="eth1">
