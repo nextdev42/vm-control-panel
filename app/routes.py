@@ -30,6 +30,17 @@ def get_interfaces():
 def index():
     interfaces = get_interfaces()
     return render_template("index.html", interfaces=interfaces)
+    
+@main.route("/network_test", methods=["GET", "POST"])
+def network_test():
+    result = ""
+    if request.method == "POST":
+        target = request.form.get("target", "").strip()
+        if target:
+            result = subprocess.getoutput(f"ping -c 4 {target}")
+        else:
+            result = "Tafadhali andika IP au hostname."
+    return render_template("network_test.html", result=result)
 
 @main.route("/set_ip", methods=["POST"])
 def set_ip():
