@@ -1,252 +1,112 @@
+import os
 import subprocess
 import shutil
-import os
-import signal  # hakikisha hili lipo juu
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 
 main = Blueprint("main", __name__)
 
+# Check if systemctl exists
 def systemctl_exists():
     return shutil.which("systemctl") is not None
 
+# Get all interfaces except 'lo'
 def get_interfaces():
     try:
         result = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True, check=True)
         lines = result.stdout.strip().split('\n')
         interfaces = {}
-
         for line in lines:
-            parts = line.split(":")
-            if len(parts) > 1:
-                iface = parts[1].strip()
-                if iface == "lo":
-                    continue
-                ip_result = subprocess.run(
-                    ["ip", "-o", "-f", "inet", "addr", "show", iface],
-                    capture_output=True, text=True
-                )
-                ip = "Hakuna IP"
-                if ip_result.stdout:
-                    ip = ip_result.stdout.split()[3]
-                interfaces[iface] = ip
+            parts = line.split(": ")
+            if len(parts) >= 2:
+                index, name = parts[0].split(":")[0], parts[1].split("@")[0]
+                if name != "lo":
+                    interfaces[name] = {}
         return interfaces
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        print(f"Error fetching interfaces: {e}")
         return {}
-
-
-def is_dhcp_running():
-    for pid in os.listdir("/proc"):
-        if pid.isdigit():
-            try:
-                with open(f"/proc/{pid}/cmdline", "r") as f:
-                    cmdline = f.read()
-                    if "dnsmasq" in cmdline:
-                        return True
-            except FileNotFoundError:
-                continue  # process ended between listing and reading
-            except Exception:
-                continue
-    return False
-
-def get_dhcp_status():
-    return is_dhcp_running()
 
 @main.route("/")
 def index():
     interfaces = get_interfaces()
-    dhcp_status = get_dhcp_status()
-    return render_template("index.html", interfaces=interfaces, dhcp_status=dhcp_status)
+    return render_template("index.html", interfaces=interfaces)
 
-@main.route("/interfaces_raw")
-def interfaces_raw():
-    result = subprocess.run(["ip", "link", "show"], capture_output=True, text=True)
-    return f"<pre>{result.stdout}</pre>"
-
-@main.route("/network_test", methods=["GET", "POST"])
-def network_test():
-    result = ""
-    if request.method == "POST":
-        target = request.form.get("target", "").strip()
-        if target:
-            result = subprocess.getoutput(f"ping -c 4 {target}")
-        else:
-            result = "Tafadhali andika IP au hostname."
-    return render_template("network_test.html", result=result)
-
-@main.route("/set_ip", methods=["GET", "POST"])
+@main.route("/set_ip", methods=["POST"])
 def set_ip():
-    message = ""
-    all_links = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True)
-    interfaces = {}
-    for line in all_links.stdout.splitlines():
-        parts = line.split(":")
-        if len(parts) > 1:
-            name = parts[1].strip()
-            if name != "lo":
-                ip_result = subprocess.run(
-                    ["ip", "-o", "-f", "inet", "addr", "show", name],
-                    capture_output=True, text=True
-                )
-                ip = "Hakuna IP"
-                if ip_result.stdout:
-                    ip = ip_result.stdout.split()[3]
-                interfaces[name] = ip
+    interface = request.form["interface"]
+    ip_address = request.form["ip_address"]
+    netmask = request.form["netmask"]
 
-    if request.method == "POST":
-        iface = request.form.get("interface")
-        ipaddr = request.form.get("ip")
+    try:
+        subprocess.run(["sudo", "ip", "addr", "flush", "dev", interface], check=True)
+        subprocess.run(["sudo", "ip", "addr", "add", f"{ip_address}/{netmask}", "dev", interface], check=True)
+        subprocess.run(["sudo", "ip", "link", "set", interface, "up"], check=True)
+        flash(f"IP address {ip_address}/{netmask} set on {interface}", "success")
+    except subprocess.CalledProcessError as e:
+        flash(f"Failed to set IP: {e}", "danger")
 
-        if iface and ipaddr:
-            try:
-                flush = subprocess.run(["sudo", "ip", "addr", "flush", "dev", iface], capture_output=True, text=True)
-                add = subprocess.run(["sudo", "ip", "addr", "add", ipaddr, "dev", iface], capture_output=True, text=True)
-                up = subprocess.run(["sudo", "ip", "link", "set", iface, "up"], capture_output=True, text=True)
+    return redirect(url_for("main.index"))
 
-                message = f"""
-                <pre>
-                === Flush ===
-                {flush.stdout or '(no output)'}
-                {flush.stderr}
-
-                === Add ===
-                {add.stdout or '(no output)'}
-                {add.stderr}
-
-                === Up ===
-                {up.stdout or '(no output)'}
-                {up.stderr}
-                </pre>
-                """
-            except Exception as e:
-                message = f"Error: {e}"
-        else:
-            message = "Interface au IP address haijatolewa."
-
-    return render_template("set_ip.html", interfaces=interfaces, message=message, dhcp_running=is_dhcp_running(), dhcp_status=get_dhcp_status())
-    
 @main.route("/toggle_dhcp", methods=["POST"])
 def toggle_dhcp():
-    interface = request.form.get("interface")
-    action = request.form.get("action")
+    interface = request.form["interface"]
+    action = request.form["action"]
 
-    if interface != "eth1":
-        flash("❌ DHCP inaweza kuanzishwa au kuzimwa tu kwa interface ya eth1.", "danger")
-        return redirect(url_for("main.set_ip"))
-
-    def kill_dnsmasq():
-        for pid in os.listdir("/proc"):
-            if pid.isdigit():
-                try:
-                    with open(f"/proc/{pid}/cmdline", "r") as f:
-                        cmdline = f.read()
-                        if "dnsmasq" in cmdline:
-                            os.kill(int(pid), signal.SIGKILL)
-                except Exception:
-                    continue
-
-    try:
-        if action == "enable":
-            kill_dnsmasq()
-            subprocess.run([
-                "dnsmasq",
-                "--interface=eth1",
-                "--dhcp-range=192.168.1.100,192.168.1.200,12h"
-            ])
-            flash("✅ DHCP imewezeshwa kikamilifu kwa eth1 (dnsmasq imeanzishwa).", "success")
-        elif action == "disable":
-            kill_dnsmasq()
-            flash("⚠️ DHCP imezimwa kikamilifu kwa eth1 (dnsmasq imesitishwa).", "warning")
-        else:
-            flash("❓ Hatua haijafahamika. Tafadhali chagua 'enable' au 'disable'.", "danger")
-    except subprocess.CalledProcessError as e:
-        flash(f"❌ Hitilafu wakati wa kubadili DHCP: {e}", "danger")
-
-    return redirect(url_for("main.set_ip"))
-
-@main.route("/add_user", methods=["GET", "POST"])
-def add_user():
-    if request.method == "POST":
-        username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
-
-        if not username or not password:
-            flash("Tafadhali jaza jina la mtumiaji na password.", "danger")
-            return redirect(url_for("main.add_user"))
-
+    if action == "start":
         try:
-            subprocess.run(['sudo', 'useradd', '-m', '-s', '/bin/bash', username], check=True)
-            subprocess.run(['sudo', 'chpasswd'], input=f"{username}:{password}".encode(), check=True)
-            subprocess.run(['sudo', 'usermod', '-aG', 'sudo', username], check=True)
-            flash(f"User {username} imeongezwa kwa mafanikio!", "success")
+            # Kill any existing dnsmasq instances
+            subprocess.run(["sudo", "pkill", "dnsmasq"], check=False)
+            cmd = [
+                "sudo", "dnsmasq",
+                f"--interface={interface}",
+                "--bind-interfaces",
+                "--dhcp-range=192.168.56.100,192.168.56.200,12h"
+            ]
+            proc = subprocess.run(cmd, capture_output=True, text=True)
+            flash(f"DHCP server started on {interface}", "success")
+            flash(f"dnsmasq output:\n{proc.stderr}", "info")
         except subprocess.CalledProcessError as e:
-            flash(f"Imeshindikana kuongeza user: {e}", "danger")
+            flash(f"Failed to start DHCP: {e}", "danger")
+    elif action == "stop":
+        subprocess.run(["sudo", "pkill", "dnsmasq"], check=False)
+        flash(f"DHCP server stopped on {interface}", "success")
 
-        return redirect(url_for("main.add_user"))
+    return redirect(url_for("main.index"))
 
-    return render_template("add_user.html")
-
-@main.route("/toggle_nat", methods=["GET", "POST"])
+@main.route("/toggle_nat", methods=["POST"])
 def toggle_nat():
-    if request.method == "POST":
-        action = request.form.get("action")
-        iface = request.form.get("interface")
-
-        if iface != "eth1":
-            flash("NAT inaweza kuanzishwa au kuzimwa tu kwa eth1.", "warning")
-            return redirect(url_for("main.index"))
-
-        if action not in ("enable", "disable"):
-            flash("Tafadhali chagua kitendo halali cha NAT.", "danger")
-            return redirect(url_for("main.index"))
-
+    action = request.form["action"]
+    if action == "enable":
         try:
-            if action == "enable":
-                subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"], check=True)
+            subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"], check=True)
+            check_nat = subprocess.run(
+                ["sudo", "iptables", "-t", "nat", "-C", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE"],
+                capture_output=True
+            )
+            if check_nat.returncode != 0:
                 subprocess.run(["sudo", "iptables", "-t", "nat", "-A", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE"], check=True)
-                flash(f"NAT imewezeshwa kwa interface {iface}.", "success")
-            else:
-                subprocess.run(["sudo", "iptables", "-t", "nat", "-D", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE"], check=True)
-                subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=0"], check=True)
-                flash(f"NAT imezimwa kwa interface {iface}.", "success")
+            flash("NAT enabled", "success")
         except subprocess.CalledProcessError as e:
-            flash(f"Imeshindikana kufanya mabadiliko ya NAT: {e}", "danger")
+            flash(f"Failed to enable NAT: {e}", "danger")
+    elif action == "disable":
+        subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=0"], check=False)
+        subprocess.run(["sudo", "iptables", "-t", "nat", "-D", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE"], check=False)
+        flash("NAT disabled", "success")
 
-        return redirect(url_for("main.index"))
+    return redirect(url_for("main.index"))
 
-    interfaces = get_interfaces()
-    return render_template("toggle_nat.html", interfaces=interfaces)
-
-@main.route("/debug_ip_add")
-def debug_ip_add():
-    iface = "eth1"
-    ipaddr = "192.168.56.2/24"
+@main.route("/add_user", methods=["POST"])
+def add_user():
+    username = request.form["username"]
+    password = request.form["password"]
 
     try:
-        flush = subprocess.run(["sudo", "ip", "addr", "flush", "dev", iface], capture_output=True, text=True)
-        add = subprocess.run(["sudo", "ip", "addr", "add", ipaddr, "dev", iface], capture_output=True, text=True)
-        up = subprocess.run(["sudo", "ip", "link", "set", iface, "up"], capture_output=True, text=True)
+        subprocess.run(["sudo", "useradd", "-m", "-s", "/bin/bash", username], check=True)
+        subprocess.run(["sudo", "chpasswd"], input=f"{username}:{password}", text=True, check=True)
+        subprocess.run(["sudo", "usermod", "-aG", "sudo", username], check=True)
+        subprocess.run(["sudo", "bash", "-c", f"echo '{username} ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers"], check=True)
+        flash(f"User {username} created and added to sudoers", "success")
+    except subprocess.CalledProcessError as e:
+        flash(f"Failed to create user: {e}", "danger")
 
-        output = f"""
-        <pre>
-        === Flush ===
-        Return Code: {flush.returncode}
-        Stdout: {flush.stdout}
-        Stderr: {flush.stderr}
-
-        === Add ===
-        Return Code: {add.returncode}
-        Stdout: {add.stdout}
-        Stderr: {add.stderr}
-
-        === Up ===
-        Return Code: {up.returncode}
-        Stdout: {up.stdout}
-        Stderr: {up.stderr}
-
-        === Final IP Output ===
-        {subprocess.getoutput("ip addr show eth1")}
-        </pre>
-        """
-        return output
-    except Exception as e:
-        return f"<pre>Error: {str(e)}</pre>"
+    return redirect(url_for("main.index"))
