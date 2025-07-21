@@ -2,12 +2,17 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
-  - name: "Start Docker and Initialize Project"
+  - name: "Initialize Project"
     init: |
-      sudo service docker start
-      echo "✅ Docker started"
+      echo "✅ Setting up dummy interfaces..."
       sudo ip link add eth1 type dummy
+      sudo ip link add vpc0 type dummy
+      sudo ip link add br0 type bridge
+      sudo ip link set eth1 master br0
+      sudo ip link set vpc0 master br0
       sudo ip link set eth1 up
+      sudo ip link set vpc0 up
+      sudo ip link set br0 up
       chmod +x setup.sh
     command: |
       bash setup.sh && python run.py
