@@ -15,7 +15,6 @@ def get_interfaces():
                 iface = parts[1].strip()
                 if iface == "lo":
                     continue
-                # Try get IP
                 ip_result = subprocess.run(
                     ["ip", "-o", "-f", "inet", "addr", "show", iface],
                     capture_output=True, text=True
@@ -28,6 +27,9 @@ def get_interfaces():
     except subprocess.CalledProcessError:
         return {}
 
+def is_dhcp_running():
+    result = subprocess.run(["systemctl", "is-active", "dnsmasq"], capture_output=True, text=True)
+    return result.stdout.strip() == "active"
 
 @main.route("/")
 def index():
@@ -49,12 +51,11 @@ def network_test():
         else:
             result = "Tafadhali andika IP au hostname."
     return render_template("network_test.html", result=result)
-    
+
 @main.route("/set_ip", methods=["GET", "POST"])
 def set_ip():
     message = ""
 
-    # Step 1: pata interface zote (pamoja na eth1 hata kama haina IP)
     all_links = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True)
     interfaces = {}
     for line in all_links.stdout.splitlines():
@@ -71,7 +72,6 @@ def set_ip():
                     ip = ip_result.stdout.split()[3]
                 interfaces[name] = ip
 
-    # Step 2: handle POST
     if request.method == "POST":
         iface = request.form.get("interface")
         ipaddr = request.form.get("ip")
@@ -111,10 +111,7 @@ def set_ip():
         else:
             message = "Interface au IP address haijatolewa."
 
-    return render_template("set_ip.html", interfaces=interfaces, message=message)
-def is_dhcp_running():
-    result = subprocess.run(["systemctl", "is-active", "dnsmasq"], capture_output=True, text=True)
-    return result.stdout.strip() == "active"
+    return render_template("set_ip.html", interfaces=interfaces, message=message, dhcp_running=is_dhcp_running())
 
 @main.route("/toggle_dhcp", methods=["POST"])
 def toggle_dhcp():
@@ -192,7 +189,6 @@ def toggle_nat():
     interfaces = get_interfaces()
     return render_template("toggle_nat.html", interfaces=interfaces)
 
-# 🔍 Debug Route for Testing IP Add
 @main.route("/debug_ip_add")
 def debug_ip_add():
     iface = "eth1"
