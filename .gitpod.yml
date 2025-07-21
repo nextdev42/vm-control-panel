@@ -2,8 +2,10 @@ image:
   file: .gitpod.Dockerfile
 
 tasks:
-  - name: "Initialize Project"
+  - name: "Start Docker and Initialize Project"
     init: |
+      sudo service docker start
+      echo "✅ Docker started"
       sudo ip link add eth1 type dummy
       sudo ip link set eth1 up
       chmod +x setup.sh
