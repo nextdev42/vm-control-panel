@@ -1,7 +1,6 @@
-# .gitpod.Dockerfile
 FROM python:3.10-slim
 
-# Install system dependencies, including git
+# Install system dependencies, including Docker
 RUN apt-get update && apt-get install -y \
     git \
     iproute2 \
@@ -12,6 +11,7 @@ RUN apt-get update && apt-get install -y \
     curl \
     nano \
     python3-pip \
+    docker.io \
     && apt-get clean
 
 # Set working directory
