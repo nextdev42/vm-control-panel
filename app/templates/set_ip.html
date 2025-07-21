@@ -9,6 +9,7 @@
   <li><code>eth1</code> ni interface ya LAN, unaweza kuweka IP statiki na kuwezesha DHCP hapa.</li>
   <li>Loopback (<code>lo</code>) haionekani kwenye orodha.</li>
 </ul>
+
 {% if dhcp_status %}
   <div class="alert alert-success">
     ✅ DHCP imewashwa kikamilifu kwa <strong>eth1</strong> (dnsmasq inaendesha).
@@ -19,19 +20,27 @@
   </div>
 {% endif %}
 
+{% if message %}
+  <div class="alert alert-info">
+    {{ message | safe }}
+  </div>
+{% endif %}
+
 <form method="POST" action="{{ url_for('main.set_ip') }}">
   <div class="mb-3">
     <label for="interface" class="form-label">Chagua Interface</label>
     <select name="interface" id="interface" class="form-select" required>
       {% for iface, ip in interfaces.items() %}
-        <option value="{{ iface }}">{{ iface }} {% if ip %}({{ ip }}){% endif %}</option>
+        <option value="{{ iface }}" {% if request.form.interface == iface %}selected{% endif %}>
+          {{ iface }} {% if ip %}({{ ip }}){% endif %}
+        </option>
       {% endfor %}
     </select>
   </div>
 
   <div class="mb-3">
     <label for="ip" class="form-label">Andika IP Address (mfano: 192.168.1.10/24)</label>
-    <input type="text" id="ip" name="ip" class="form-control" placeholder="192.168.1.10/24" required>
+    <input type="text" id="ip" name="ip" class="form-control" placeholder="192.168.1.10/24" required value="{{ request.form.ip }}">
   </div>
 
   <button type="submit" class="btn btn-primary">Sanidi IP</button>
