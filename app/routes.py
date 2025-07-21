@@ -1,6 +1,7 @@
 import subprocess
 import shutil
 import os
+import signal  # hakikisha hili lipo juu
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 
 main = Blueprint("main", __name__)
@@ -122,7 +123,7 @@ def set_ip():
             message = "Interface au IP address haijatolewa."
 
     return render_template("set_ip.html", interfaces=interfaces, message=message, dhcp_running=is_dhcp_running(), dhcp_status=get_dhcp_status())
-
+    
 @main.route("/toggle_dhcp", methods=["POST"])
 def toggle_dhcp():
     interface = request.form.get("interface")
@@ -132,9 +133,20 @@ def toggle_dhcp():
         flash("❌ DHCP inaweza kuanzishwa au kuzimwa tu kwa interface ya eth1.", "danger")
         return redirect(url_for("main.set_ip"))
 
+    def kill_dnsmasq():
+        for pid in os.listdir("/proc"):
+            if pid.isdigit():
+                try:
+                    with open(f"/proc/{pid}/cmdline", "r") as f:
+                        cmdline = f.read()
+                        if "dnsmasq" in cmdline:
+                            os.kill(int(pid), signal.SIGKILL)
+                except Exception:
+                    continue
+
     try:
         if action == "enable":
-            subprocess.run(["pkill", "dnsmasq"], stderr=subprocess.DEVNULL)
+            kill_dnsmasq()
             subprocess.run([
                 "dnsmasq",
                 "--interface=eth1",
@@ -142,7 +154,7 @@ def toggle_dhcp():
             ])
             flash("✅ DHCP imewezeshwa kikamilifu kwa eth1 (dnsmasq imeanzishwa).", "success")
         elif action == "disable":
-            subprocess.run(["pkill", "dnsmasq"])
+            kill_dnsmasq()
             flash("⚠️ DHCP imezimwa kikamilifu kwa eth1 (dnsmasq imesitishwa).", "warning")
         else:
             flash("❓ Hatua haijafahamika. Tafadhali chagua 'enable' au 'disable'.", "danger")
