@@ -41,11 +41,6 @@ def index():
     dhcp_status = get_dhcp_status()
     return render_template("index.html", interfaces=interfaces, dhcp_status=dhcp_status)
 
-@main.route("/")
-def index():
-    interfaces = get_interfaces()
-    return render_template("index.html", interfaces=interfaces)
-
 @main.route("/interfaces_raw")
 def interfaces_raw():
     result = subprocess.run(["ip", "link", "show"], capture_output=True, text=True)
