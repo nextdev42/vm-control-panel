@@ -39,33 +39,70 @@ def network_test():
         else:
             result = "Tafadhali andika IP au hostname."
     return render_template("network_test.html", result=result)
-
+    
 @main.route("/set_ip", methods=["GET", "POST"])
 def set_ip():
+    message = ""
+
+    # Step 1: pata interface zote (pamoja na eth1 hata kama haina IP)
+    all_links = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True)
+    interfaces = {}
+    for line in all_links.stdout.splitlines():
+        parts = line.split(":")
+        if len(parts) > 1:
+            name = parts[1].strip()
+            if name != "lo":
+                ip_result = subprocess.run(
+                    ["ip", "-o", "-f", "inet", "addr", "show", name],
+                    capture_output=True, text=True
+                )
+                ip = "Hakuna IP"
+                if ip_result.stdout:
+                    ip = ip_result.stdout.split()[3]
+                interfaces[name] = ip
+
+    # Step 2: handle POST
     if request.method == "POST":
-        iface = request.form.get("interface", "").strip()
-        ipaddr = request.form.get("ip", "").strip()
+        iface = request.form.get("interface")
+        ipaddr = request.form.get("ip")
 
-        if iface != "eth1":
-            flash("Samahani, unaweza kuweka IP statiki tu kwa eth1.", "warning")
-            return redirect(url_for("main.set_ip"))
+        if iface and ipaddr:
+            try:
+                flush = subprocess.run(
+                    ["sudo", "ip", "addr", "flush", "dev", iface],
+                    capture_output=True, text=True
+                )
+                add = subprocess.run(
+                    ["sudo", "ip", "addr", "add", ipaddr, "dev", iface],
+                    capture_output=True, text=True
+                )
+                up = subprocess.run(
+                    ["sudo", "ip", "link", "set", iface, "up"],
+                    capture_output=True, text=True
+                )
 
-        if not ipaddr:
-            flash("Tafadhali andika IP address.", "danger")
-            return redirect(url_for("main.set_ip"))
+                message = f"""
+                <pre>
+                === Flush ===
+                {flush.stdout or '(no output)'}
+                {flush.stderr}
 
-        try:
-            subprocess.run(["sudo", "ip", "addr", "flush", "dev", iface], check=True)
-            subprocess.run(["sudo", "ip", "addr", "add", ipaddr, "dev", iface], check=True)
-            subprocess.run(["sudo", "ip", "link", "set", iface, "up"], check=True)
-            flash(f"IP {ipaddr} imewekwa kwa {iface}", "success")
-        except subprocess.CalledProcessError as e:
-            flash(f"Imeshindikana kuweka IP: {e}", "danger")
+                === Add ===
+                {add.stdout or '(no output)'}
+                {add.stderr}
 
-        return redirect(url_for("main.set_ip"))
+                === Up ===
+                {up.stdout or '(no output)'}
+                {up.stderr}
+                </pre>
+                """
+            except Exception as e:
+                message = f"Error: {e}"
+        else:
+            message = "Interface au IP address haijatolewa."
 
-    interfaces = get_interfaces()
-    return render_template("set_ip.html", interfaces=interfaces)
+    return render_template("set_ip.html", interfaces=interfaces, message=message)
+
 
 @main.route("/toggle_dhcp", methods=["GET", "POST"])
 def toggle_dhcp():
