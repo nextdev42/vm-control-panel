@@ -50,9 +50,9 @@ def set_ip():
             return redirect(url_for("main.set_ip"))
 
         try:
-            subprocess.run(["sudo", "ip", "addr", "flush", "dev", iface], check=True)
-            subprocess.run(["sudo", "ip", "addr", "add", ipaddr, "dev", iface], check=True)
-            subprocess.run(["sudo", "ip", "link", "set", iface, "up"], check=True)
+            subprocess.run(["ip", "addr", "flush", "dev", iface], check=True)
+            subprocess.run(["ip", "addr", "add", ipaddr, "dev", iface], check=True)
+            subprocess.run(["ip", "link", "set", iface, "up"], check=True)
             flash(f"IP {ipaddr} imewekwa kwa {iface}", "success")
         except subprocess.CalledProcessError as e:
             flash(f"Imeshindikana kuweka IP: {e}", "danger")
