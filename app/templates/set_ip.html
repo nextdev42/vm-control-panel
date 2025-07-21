@@ -15,7 +15,7 @@
     <label for="interface" class="form-label">Chagua Interface</label>
     <select name="interface" id="interface" class="form-select" required>
       {% for iface, ip in interfaces.items() %}
-        <option value="{{ iface }}">{{ iface }} ({{ ip }})</option>
+        <option value="{{ iface }}">{{ iface }} {% if ip %}({{ ip }}){% endif %}</option>
       {% endfor %}
     </select>
   </div>
