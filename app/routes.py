@@ -121,7 +121,7 @@ def set_ip():
         else:
             message = "Interface au IP address haijatolewa."
 
-    return render_template("set_ip.html", interfaces=interfaces, message=message, dhcp_running=is_dhcp_running())
+    return render_template("set_ip.html", interfaces=interfaces, message=message, dhcp_running=is_dhcp_running(), dhcp_status=get_dhcp_status())
 
 @main.route("/toggle_dhcp", methods=["POST"])
 def toggle_dhcp():
