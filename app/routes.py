@@ -113,33 +113,30 @@ def set_ip():
 
     return render_template("set_ip.html", interfaces=interfaces, message=message)
 
-
-@main.route("/toggle_dhcp", methods=["GET", "POST"])
+@main.route("/toggle_dhcp", methods=["POST"])
 def toggle_dhcp():
-    if request.method == "POST":
-        action = request.form.get("action")
-        iface = request.form.get("interface")
+    interface = request.form.get("interface")
+    action = request.form.get("action")
 
-        if iface != "eth1":
-            flash("DHCP inaweza kuanzishwa au kuzimwa tu kwa eth1.", "warning")
-            return redirect(url_for("main.index"))
-
-        if action not in ("enable", "disable"):
-            flash("Tafadhali chagua kitendo halali cha DHCP.", "danger")
-            return redirect(url_for("main.index"))
-
-        try:
-            if action == "enable":
-                subprocess.run(["sudo", "systemctl", "start", "dnsmasq"], check=True)
-            else:
-                subprocess.run(["sudo", "systemctl", "stop", "dnsmasq"], check=True)
-            flash(f"DHCP ime{action}wa kwa interface {iface}.", "success")
-        except subprocess.CalledProcessError as e:
-            flash(f"Imeshindikana kufanya mabadiliko ya DHCP: {e}", "danger")
-
+    if interface != "eth1":
+        flash("DHCP inaweza kuanzishwa au kuzimwa tu kwa eth1.", "danger")
         return redirect(url_for("main.index"))
 
-    return render_template("toggle_dhcp.html")
+    try:
+        if action == "enable":
+            # Replace this with your actual dhcp start command, e.g., systemctl or dnsmasq
+            subprocess.run(["sudo", "systemctl", "start", "dnsmasq"], check=True)
+            flash("✅ DHCP imewashwa kwa mafanikio kwa eth1.", "success")
+        elif action == "disable":
+            subprocess.run(["sudo", "systemctl", "stop", "dnsmasq"], check=True)
+            flash("⚠️ DHCP imezimwa kwa mafanikio kwa eth1.", "warning")
+        else:
+            flash("Hatua haijafahamika. Tafadhali chagua enable au disable.", "danger")
+    except subprocess.CalledProcessError as e:
+        flash(f"⚠️ Hitilafu: {e}", "danger")
+
+    return redirect(url_for("main.index"))
+
 
 @main.route("/add_user", methods=["GET", "POST"])
 def add_user():
