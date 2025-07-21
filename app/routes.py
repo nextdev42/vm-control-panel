@@ -1,7 +1,11 @@
 import subprocess
+import shutil
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 
 main = Blueprint("main", __name__)
+
+def systemctl_exists():
+    return shutil.which("systemctl") is not None
 
 def get_interfaces():
     try:
@@ -28,10 +32,14 @@ def get_interfaces():
         return {}
 
 def is_dhcp_running():
+    if not systemctl_exists():
+        return False
     result = subprocess.run(["systemctl", "is-active", "dnsmasq"], capture_output=True, text=True)
     return result.stdout.strip() == "active"
-    
+
 def get_dhcp_status():
+    if not systemctl_exists():
+        return False
     result = subprocess.run(["systemctl", "is-active", "dnsmasq"], capture_output=True, text=True)
     return result.stdout.strip() == "active"
 
@@ -125,6 +133,10 @@ def toggle_dhcp():
 
     if interface != "eth1":
         flash("❌ DHCP inaweza kuanzishwa au kuzimwa tu kwa interface ya eth1.", "danger")
+        return redirect(url_for("main.set_ip"))
+
+    if not systemctl_exists():
+        flash("❌ systemctl haipo, haiwezi kudhibiti DHCP.", "danger")
         return redirect(url_for("main.set_ip"))
 
     try:
