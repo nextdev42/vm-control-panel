@@ -5,7 +5,7 @@ import subprocess
 import time
 
 # Replace this with your test interface (like 'vpc0')
-INTERFACE = 'vpc0'
+INTERFACE = 'eth1'
 
 # Generate a random MAC address
 def random_mac():
