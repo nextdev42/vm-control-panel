@@ -29,7 +29,6 @@ def interfaces_raw():
     result = subprocess.run(["ip", "link", "show"], capture_output=True, text=True)
     return f"<pre>{result.stdout}</pre>"
 
-
 @main.route("/network_test", methods=["GET", "POST"])
 def network_test():
     result = ""
@@ -93,7 +92,6 @@ def toggle_dhcp():
 
         return redirect(url_for("main.index"))
 
-    # GET method: onyesha form ya toggle DHCP
     return render_template("toggle_dhcp.html")
 
 @main.route("/add_user", methods=["GET", "POST"])
@@ -134,21 +132,11 @@ def toggle_nat():
 
         try:
             if action == "enable":
-                # Enable IP forwarding
                 subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"], check=True)
-                # Setup NAT with iptables masquerade on eth0 (assume eth0 is public interface)
-                subprocess.run([
-                    "sudo", "iptables", "-t", "nat", "-A", "POSTROUTING",
-                    "-o", "eth0", "-j", "MASQUERADE"
-                ], check=True)
+                subprocess.run(["sudo", "iptables", "-t", "nat", "-A", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE"], check=True)
                 flash(f"NAT imewezeshwa kwa interface {iface}.", "success")
             else:
-                # Disable NAT (remove masquerade rule)
-                subprocess.run([
-                    "sudo", "iptables", "-t", "nat", "-D", "POSTROUTING",
-                    "-o", "eth0", "-j", "MASQUERADE"
-                ], check=True)
-                # Disable IP forwarding
+                subprocess.run(["sudo", "iptables", "-t", "nat", "-D", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE"], check=True)
                 subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=0"], check=True)
                 flash(f"NAT imezimwa kwa interface {iface}.", "success")
         except subprocess.CalledProcessError as e:
@@ -158,3 +146,17 @@ def toggle_nat():
 
     interfaces = get_interfaces()
     return render_template("toggle_nat.html", interfaces=interfaces)
+
+# 🔍 Debug Route for Testing IP Add
+@main.route("/debug_ip_add")
+def debug_ip_add():
+    try:
+        result = subprocess.run(
+            ["sudo", "ip", "addr", "add", "192.168.56.1/24", "dev", "eth1"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return f"<pre>✅ Success:\n{result.stdout}</pre>"
+    except subprocess.CalledProcessError as e:
+        return f"<pre>❌ Error:\n{e.stderr or str(e)}</pre>"
