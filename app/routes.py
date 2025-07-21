@@ -5,19 +5,29 @@ main = Blueprint("main", __name__)
 
 def get_interfaces():
     try:
-        result = subprocess.run(['ip', '-o', 'addr', 'show'], capture_output=True, text=True, check=True)
+        result = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True, check=True)
         lines = result.stdout.strip().split('\n')
         interfaces = {}
+
         for line in lines:
-            parts = line.split()
-            iface = parts[1]
-            if iface == "lo":
-                continue
-            ip = parts[3] if len(parts) > 3 and '/' in parts[3] else None
-            interfaces[iface] = ip or "No IP assigned"
+            parts = line.split(":")
+            if len(parts) > 1:
+                iface = parts[1].strip()
+                if iface == "lo":
+                    continue
+                # Try get IP
+                ip_result = subprocess.run(
+                    ["ip", "-o", "-f", "inet", "addr", "show", iface],
+                    capture_output=True, text=True
+                )
+                ip = "Hakuna IP"
+                if ip_result.stdout:
+                    ip = ip_result.stdout.split()[3]
+                interfaces[iface] = ip
         return interfaces
     except subprocess.CalledProcessError:
         return {}
+
 
 @main.route("/")
 def index():
