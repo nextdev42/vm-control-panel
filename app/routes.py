@@ -150,13 +150,44 @@ def toggle_nat():
 # 🔍 Debug Route for Testing IP Add
 @main.route("/debug_ip_add")
 def debug_ip_add():
+    iface = "eth1"
+    ipaddr = "192.168.56.2/24"
+
     try:
-        result = subprocess.run(
-            ["sudo", "ip", "addr", "add", "192.168.56.1/24", "dev", "eth1"],
-            capture_output=True,
-            text=True,
-            check=True
+        flush = subprocess.run(
+            ["sudo", "ip", "addr", "flush", "dev", iface],
+            capture_output=True, text=True
         )
-        return f"<pre>✅ Success:\n{result.stdout}</pre>"
-    except subprocess.CalledProcessError as e:
-        return f"<pre>❌ Error:\n{e.stderr or str(e)}</pre>"
+        add = subprocess.run(
+            ["sudo", "ip", "addr", "add", ipaddr, "dev", iface],
+            capture_output=True, text=True
+        )
+        up = subprocess.run(
+            ["sudo", "ip", "link", "set", iface, "up"],
+            capture_output=True, text=True
+        )
+
+        output = f"""
+        <pre>
+        === Flush ===
+        Return Code: {flush.returncode}
+        Stdout: {flush.stdout}
+        Stderr: {flush.stderr}
+
+        === Add ===
+        Return Code: {add.returncode}
+        Stdout: {add.stdout}
+        Stderr: {add.stderr}
+
+        === Up ===
+        Return Code: {up.returncode}
+        Stdout: {up.stdout}
+        Stderr: {up.stderr}
+
+        === Final IP Output ===
+        {subprocess.getoutput("ip addr show eth1")}
+        </pre>
+        """
+        return output
+    except Exception as e:
+        return f"<pre>Error: {str(e)}</pre>"
