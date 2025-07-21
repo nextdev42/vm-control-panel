@@ -88,8 +88,8 @@ def toggle_dhcp():
         flash(f"❌ Hitilafu wakati wa kubadili DHCP: {e}", "danger")
 
     return redirect(url_for("main.set_ip"))
+    
 @main.route("/add_user", methods=["GET", "POST"])
-
 def add_user():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
