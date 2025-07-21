@@ -9,6 +9,15 @@
   <li><code>eth1</code> ni interface ya LAN, unaweza kuweka IP statiki na kuwezesha DHCP hapa.</li>
   <li>Loopback (<code>lo</code>) haionekani kwenye orodha.</li>
 </ul>
+{% if dhcp_status %}
+  <div class="alert alert-success">
+    ✅ DHCP imewashwa kikamilifu kwa <strong>eth1</strong> (dnsmasq inaendesha).
+  </div>
+{% else %}
+  <div class="alert alert-secondary">
+    ⚠️ DHCP haijawashwa kwa <strong>eth1</strong> (dnsmasq haiko hai).
+  </div>
+{% endif %}
 
 <form method="POST" action="{{ url_for('main.set_ip') }}">
   <div class="mb-3">
