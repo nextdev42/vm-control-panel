@@ -5,17 +5,21 @@ tasks:
   - name: "Initialize Project"
     init: |
       echo "✅ Setting up dummy interfaces..."
-      sudo ip link add eth1 type dummy
-      sudo ip link add vpc0 type dummy
-      sudo ip link add br0 type bridge
-      sudo ip link set eth1 master br0
-      sudo ip link set vpc0 master br0
-      sudo ip link set eth1 up
-      sudo ip link set vpc0 up
-      sudo ip link set br0 up
+      sudo ip link show eth1 || sudo ip link add eth1 type dummy
+      sudo ip link show vpc0 || sudo ip link add vpc0 type dummy
+      sudo ip link show br0 || sudo ip link add br0 type bridge
+      sudo ip link set eth1 master br0 || true
+      sudo ip link set vpc0 master br0 || true
+      sudo ip link set eth1 up || true
+      sudo ip link set vpc0 up || true
+      sudo ip link set br0 up || true
       chmod +x setup.sh
+  - name: "Run App"
     command: |
-      bash setup.sh && python run.py
+      bash setup.sh
+      sudo pkill dnsmasq || true
+      sudo dnsmasq --conf-file=/etc/dnsmasq.conf
+      python run.py
 
 ports:
   - port: 5000
