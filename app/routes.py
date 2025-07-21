@@ -1,6 +1,7 @@
 import subprocess import shutil from flask import Blueprint, render_template, request, redirect, url_for, flash
 
-main = Blueprint("main", name)
+main = Blueprint("main", __name__)
+
 
 def systemctl_exists(): return shutil.which("systemctl") is not None
 
