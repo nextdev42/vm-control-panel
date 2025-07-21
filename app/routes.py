@@ -1,5 +1,6 @@
 import subprocess
 import shutil
+import os
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 
 main = Blueprint("main", __name__)
@@ -31,17 +32,20 @@ def get_interfaces():
     except subprocess.CalledProcessError:
         return {}
 
+
 def is_dhcp_running():
-    try:
-        result = subprocess.run(
-            ["ps", "aux"],
-            capture_output=True,
-            text=True,
-            check=True
-        )
-        return any("dnsmasq" in line and "grep" not in line for line in result.stdout.splitlines())
-    except subprocess.CalledProcessError:
-        return False
+    for pid in os.listdir("/proc"):
+        if pid.isdigit():
+            try:
+                with open(f"/proc/{pid}/cmdline", "r") as f:
+                    cmdline = f.read()
+                    if "dnsmasq" in cmdline:
+                        return True
+            except FileNotFoundError:
+                continue  # process ended between listing and reading
+            except Exception:
+                continue
+    return False
 
 def get_dhcp_status():
     return is_dhcp_running()
