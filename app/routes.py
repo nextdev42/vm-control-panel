@@ -57,6 +57,10 @@ def set_ip():
     # Step 1: pata interface zote (pamoja na eth1 hata kama haina IP)
     all_links = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True)
     interfaces = {}
+    def is_dhcp_running():
+    result = subprocess.run(["systemctl", "is-active", "dnsmasq"], capture_output=True, text=True)
+    return result.stdout.strip() == "active"
+
     for line in all_links.stdout.splitlines():
         parts = line.split(":")
         if len(parts) > 1:
@@ -119,24 +123,22 @@ def toggle_dhcp():
     action = request.form.get("action")
 
     if interface != "eth1":
-        flash("DHCP inaweza kuanzishwa au kuzimwa tu kwa eth1.", "danger")
-        return redirect(url_for("main.index"))
+        flash("❌ DHCP inaweza kuanzishwa au kuzimwa tu kwa interface ya eth1.", "danger")
+        return redirect(url_for("main.set_ip"))
 
     try:
         if action == "enable":
-            # Replace this with your actual dhcp start command, e.g., systemctl or dnsmasq
-            subprocess.run(["sudo", "systemctl", "start", "dnsmasq"], check=True)
-            flash("✅ DHCP imewashwa kwa mafanikio kwa eth1.", "success")
+            subprocess.run(["sudo", "systemctl", "enable", "--now", "dnsmasq"], check=True)
+            flash("✅ DHCP imewezeshwa kikamilifu kwa eth1 (dnsmasq imeanzishwa).", "success")
         elif action == "disable":
-            subprocess.run(["sudo", "systemctl", "stop", "dnsmasq"], check=True)
-            flash("⚠️ DHCP imezimwa kwa mafanikio kwa eth1.", "warning")
+            subprocess.run(["sudo", "systemctl", "disable", "--now", "dnsmasq"], check=True)
+            flash("⚠️ DHCP imezimwa kikamilifu kwa eth1 (dnsmasq imesitishwa).", "warning")
         else:
-            flash("Hatua haijafahamika. Tafadhali chagua enable au disable.", "danger")
+            flash("❓ Hatua haijafahamika. Tafadhali chagua 'enable' au 'disable'.", "danger")
     except subprocess.CalledProcessError as e:
-        flash(f"⚠️ Hitilafu: {e}", "danger")
+        flash(f"❌ Hitilafu wakati wa kubadili DHCP: {e}", "danger")
 
-    return redirect(url_for("main.index"))
-
+    return redirect(url_for("main.set_ip"))
 
 @main.route("/add_user", methods=["GET", "POST"])
 def add_user():
