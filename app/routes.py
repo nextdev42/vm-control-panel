@@ -32,8 +32,16 @@ def get_interfaces():
         return {}
 
 def is_dhcp_running():
-    result = subprocess.run(["pgrep", "dnsmasq"], capture_output=True)
-    return result.returncode == 0
+    try:
+        result = subprocess.run(
+            ["ps", "aux"],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        return any("dnsmasq" in line and "grep" not in line for line in result.stdout.splitlines())
+    except subprocess.CalledProcessError:
+        return False
 
 def get_dhcp_status():
     return is_dhcp_running()
