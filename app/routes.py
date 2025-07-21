@@ -30,6 +30,16 @@ def get_interfaces():
 def is_dhcp_running():
     result = subprocess.run(["systemctl", "is-active", "dnsmasq"], capture_output=True, text=True)
     return result.stdout.strip() == "active"
+    
+def get_dhcp_status():
+    result = subprocess.run(["systemctl", "is-active", "dnsmasq"], capture_output=True, text=True)
+    return result.stdout.strip() == "active"
+
+@main.route("/")
+def index():
+    interfaces = get_interfaces()
+    dhcp_status = get_dhcp_status()
+    return render_template("index.html", interfaces=interfaces, dhcp_status=dhcp_status)
 
 @main.route("/")
 def index():
