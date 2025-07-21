@@ -24,6 +24,12 @@ def index():
     interfaces = get_interfaces()
     return render_template("index.html", interfaces=interfaces)
 
+@main.route("/interfaces_raw")
+def interfaces_raw():
+    result = subprocess.run(["ip", "link", "show"], capture_output=True, text=True)
+    return f"<pre>{result.stdout}</pre>"
+
+
 @main.route("/network_test", methods=["GET", "POST"])
 def network_test():
     result = ""
