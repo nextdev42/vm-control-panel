@@ -1,58 +1,137 @@
-import os
 import subprocess
+import shutil
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 
 main = Blueprint("main", __name__)
 
+def systemctl_exists():
+    return shutil.which("systemctl") is not None
+
+def get_interfaces():
+    try:
+        result = subprocess.run(
+            ["ip", "-o", "link", "show"],
+            capture_output=True, text=True, check=True
+        )
+        lines = result.stdout.strip().split('\n')
+        interfaces = {}
+
+        for line in lines:
+            parts = line.split(":")
+            if len(parts) > 1:
+                iface = parts[1].strip()
+                if iface == "lo":
+                    continue
+                ip_result = subprocess.run(
+                    ["ip", "-o", "-f", "inet", "addr", "show", iface],
+                    capture_output=True, text=True
+                )
+                ip = "Hakuna IP"
+                if ip_result.stdout:
+                    ip = ip_result.stdout.split()[3]
+                interfaces[iface] = ip
+        return interfaces
+    except subprocess.CalledProcessError:
+        return {}
+
+def is_dhcp_running():
+    if systemctl_exists():
+        result = subprocess.run(["systemctl", "is-active", "dnsmasq"], capture_output=True, text=True)
+        return result.stdout.strip() == "active"
+    else:
+        # Kama systemctl haipo, angalia kama dnsmasq inaendeshwa kwa kutumia ps
+        try:
+            output = subprocess.check_output(["ps", "aux"], text=True)
+            return "dnsmasq" in output
+        except Exception:
+            return False
+
+def get_dhcp_status():
+    # Inarudi kama is_dhcp_running, kwa sababu ya future expansion
+    return is_dhcp_running()
+
 @main.route("/")
 def index():
-    return redirect(url_for("main.set_ip"))
+    interfaces = get_interfaces()
+    dhcp_status = get_dhcp_status()
+    return render_template("index.html", interfaces=interfaces, dhcp_status=dhcp_status)
 
-def get_ip_address(interface):
-    try:
-        result = subprocess.check_output(["ip", "addr", "show", interface], text=True)
-        for line in result.splitlines():
-            line = line.strip()
-            if line.startswith("inet "):
-                return line.split()[1]  # Return IP with CIDR
-        return "Hakuna IP"
-    except subprocess.CalledProcessError:
-        return "Interface haipo"
+@main.route("/interfaces_raw")
+def interfaces_raw():
+    result = subprocess.run(["ip", "link", "show"], capture_output=True, text=True)
+    return f"<pre>{result.stdout}</pre>"
 
-def is_dnsmasq_running():
-    try:
-        output = subprocess.check_output(["ps", "aux"], text=True)
-        return "dnsmasq" in output
-    except Exception:
-        return False
+@main.route("/network_test", methods=["GET", "POST"])
+def network_test():
+    result = ""
+    if request.method == "POST":
+        target = request.form.get("target", "").strip()
+        if target:
+            result = subprocess.getoutput(f"ping -c 4 {target}")
+        else:
+            result = "Tafadhali andika IP au hostname."
+    return render_template("network_test.html", result=result)
 
 @main.route("/set_ip", methods=["GET", "POST"])
 def set_ip():
+    message = ""
+
+    all_links = subprocess.run(["ip", "-o", "link", "show"], capture_output=True, text=True)
+    interfaces = {}
+    for line in all_links.stdout.splitlines():
+        parts = line.split(":")
+        if len(parts) > 1:
+            name = parts[1].strip()
+            if name != "lo":
+                ip_result = subprocess.run(
+                    ["ip", "-o", "-f", "inet", "addr", "show", name],
+                    capture_output=True, text=True
+                )
+                ip = "Hakuna IP"
+                if ip_result.stdout:
+                    ip = ip_result.stdout.split()[3]
+                interfaces[name] = ip
+
     if request.method == "POST":
         iface = request.form.get("interface")
-        ip_address = request.form.get("ip_address")
-        netmask = request.form.get("netmask")
+        ipaddr = request.form.get("ip")
 
-        try:
-            subprocess.run(["ip", "addr", "flush", "dev", iface], check=True)
-            subprocess.run(["ip", "addr", "add", f"{ip_address}/{netmask}", "dev", iface], check=True)
-            subprocess.run(["ip", "link", "set", iface, "up"], check=True)
-            flash(f"✅ IP {ip_address}/{netmask} imewekwa kwenye {iface}", "success")
-        except subprocess.CalledProcessError as e:
-            flash(f"❌ Hitilafu wakati wa kuweka IP: {str(e)}", "danger")
+        if iface and ipaddr:
+            try:
+                flush = subprocess.run(
+                    ["ip", "addr", "flush", "dev", iface],
+                    capture_output=True, text=True
+                )
+                add = subprocess.run(
+                    ["ip", "addr", "add", ipaddr, "dev", iface],
+                    capture_output=True, text=True
+                )
+                up = subprocess.run(
+                    ["ip", "link", "set", iface, "up"],
+                    capture_output=True, text=True
+                )
 
-        return redirect(url_for("main.set_ip"))
+                message = f"""
+<pre>
+=== Flush ===
+{flush.stdout or '(no output)'}
+{flush.stderr or ''}
 
-    try:
-        interfaces_output = subprocess.check_output(["ip", "link", "show"], text=True)
-        interfaces = [line.split(":")[1].strip() for line in interfaces_output.splitlines() 
-                      if ":" in line and not line.strip().startswith("link")]
-    except subprocess.CalledProcessError:
-        interfaces = []
+=== Add ===
+{add.stdout or '(no output)'}
+{add.stderr or ''}
 
-    ip_data = {iface: get_ip_address(iface) for iface in interfaces}
-    dhcp_status = is_dnsmasq_running()
-    return render_template("set_ip.html", interfaces=ip_data, dhcp_status=dhcp_status)
+=== Up ===
+{up.stdout or '(no output)'}
+{up.stderr or ''}
+</pre>
+"""
+            except Exception as e:
+                message = f"Error: {e}"
+        else:
+            message = "Interface au IP address haijatolewa."
+
+    return render_template("set_ip.html", interfaces=interfaces, message=message, dhcp_running=is_dhcp_running(), dhcp_status=get_dhcp_status())
 
 @main.route("/toggle_dhcp", methods=["POST"])
 def toggle_dhcp():
@@ -63,29 +142,46 @@ def toggle_dhcp():
         flash("❌ DHCP inaweza kuanzishwa au kuzimwa tu kwa interface ya eth1.", "danger")
         return redirect(url_for("main.set_ip"))
 
-    DNSMASQ = "/usr/sbin/dnsmasq"
-    PKILL = "/usr/bin/pkill"
+    if systemctl_exists():
+        try:
+            if action == "enable":
+                subprocess.run(["sudo", "systemctl", "enable", "--now", "dnsmasq"], check=True)
+                flash("✅ DHCP imewezeshwa kikamilifu kwa eth1 (dnsmasq imeanzishwa).", "success")
+            elif action == "disable":
+                subprocess.run(["sudo", "systemctl", "disable", "--now", "dnsmasq"], check=True)
+                flash("⚠️ DHCP imezimwa kikamilifu kwa eth1 (dnsmasq imesitishwa).", "warning")
+            else:
+                flash("❓ Hatua haijafahamika. Tafadhali chagua 'enable' au 'disable'.", "danger")
+        except subprocess.CalledProcessError as e:
+            flash(f"❌ Hitilafu wakati wa kubadili DHCP: {e}", "danger")
+    else:
+        # Systemctl haipo, tumia njia mbadala kuanzisha/dzima dnsmasq
+        try:
+            PKILL = shutil.which("pkill") or "/usr/bin/pkill"
+            DNSMASQ = shutil.which("dnsmasq") or "/usr/sbin/dnsmasq"
 
-    if not os.path.exists(DNSMASQ):
-        flash("❌ dnsmasq haipatikani kwenye mfumo huu.", "danger")
-        return redirect(url_for("main.set_ip"))
+            if not DNSMASQ:
+                flash("❌ dnsmasq haipatikani kwenye mfumo huu.", "danger")
+                return redirect(url_for("main.set_ip"))
 
-    try:
-        if action == "enable":
-            subprocess.run([PKILL, "dnsmasq"], stderr=subprocess.DEVNULL)
-            subprocess.run([
-                DNSMASQ,
-                "--interface=eth1",
-                "--dhcp-range=192.168.1.100,192.168.1.200,12h"
-            ], check=True)
-            flash("✅ DHCP imewezeshwa kikamilifu kwa eth1 (dnsmasq imeanzishwa).", "success")
-        elif action == "disable":
-            subprocess.run([PKILL, "dnsmasq"], check=True)
-            flash("⚠️ DHCP imezimwa kikamilifu kwa eth1 (dnsmasq imesitishwa).", "warning")
-        else:
-            flash("❓ Hatua haijafahamika. Tafadhali chagua 'enable' au 'disable'.", "danger")
-    except subprocess.CalledProcessError as e:
-        flash(f"❌ Hitilafu wakati wa kubadili DHCP: {e}", "danger")
+            if action == "enable":
+                subprocess.run([PKILL, "dnsmasq"], stderr=subprocess.DEVNULL)
+                # Anzisha dnsmasq kama process isiyo na blocking
+                subprocess.Popen([
+                    DNSMASQ,
+                    "--interface=eth1",
+                    "--dhcp-range=192.168.1.100,192.168.1.200,12h"
+                ])
+                flash("✅ DHCP imewezeshwa kwa eth1 (dnsmasq imeanzishwa kupitia njia mbadala).", "success")
+            elif action == "disable":
+                subprocess.run([PKILL, "dnsmasq"], check=True)
+                flash("⚠️ DHCP imezimwa kwa eth1 (dnsmasq imesitishwa kupitia njia mbadala).", "warning")
+            else:
+                flash("❓ Hatua haijafahamika. Tafadhali chagua 'enable' au 'disable'.", "danger")
+        except subprocess.CalledProcessError as e:
+            flash(f"❌ Hitilafu wakati wa kubadili DHCP: {e}", "danger")
+        except Exception as e:
+            flash(f"❌ Hitilafu isiyotarajiwa: {e}", "danger")
 
     return redirect(url_for("main.set_ip"))
 
@@ -110,3 +206,78 @@ def add_user():
         return redirect(url_for("main.add_user"))
 
     return render_template("add_user.html")
+
+@main.route("/toggle_nat", methods=["GET", "POST"])
+def toggle_nat():
+    if request.method == "POST":
+        action = request.form.get("action")
+        iface = request.form.get("interface")
+
+        if iface != "eth1":
+            flash("NAT inaweza kuanzishwa au kuzimwa tu kwa eth1.", "warning")
+            return redirect(url_for("main.index"))
+
+        if action not in ("enable", "disable"):
+            flash("Tafadhali chagua kitendo halali cha NAT.", "danger")
+            return redirect(url_for("main.index"))
+
+        try:
+            if action == "enable":
+                subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=1"], check=True)
+                subprocess.run(["sudo", "iptables", "-t", "nat", "-A", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE"], check=True)
+                flash(f"NAT imewezeshwa kwa interface {iface}.", "success")
+            else:
+                subprocess.run(["sudo", "iptables", "-t", "nat", "-D", "POSTROUTING", "-o", "eth0", "-j", "MASQUERADE"], check=True)
+                subprocess.run(["sudo", "sysctl", "-w", "net.ipv4.ip_forward=0"], check=True)
+                flash(f"NAT imezimwa kwa interface {iface}.", "success")
+        except subprocess.CalledProcessError as e:
+            flash(f"Imeshindikana kufanya mabadiliko ya NAT: {e}", "danger")
+
+        return redirect(url_for("main.index"))
+
+    interfaces = get_interfaces()
+    return render_template("toggle_nat.html", interfaces=interfaces)
+
+@main.route("/debug_ip_add")
+def debug_ip_add():
+    iface = "eth1"
+    ipaddr = "192.168.56.2/24"
+
+    try:
+        flush = subprocess.run(
+            ["ip", "addr", "flush", "dev", iface],
+            capture_output=True, text=True
+        )
+        add = subprocess.run(
+            ["ip", "addr", "add", ipaddr, "dev", iface],
+            capture_output=True, text=True
+        )
+        up = subprocess.run(
+            ["ip", "link", "set", iface, "up"],
+            capture_output=True, text=True
+        )
+
+        output = f"""
+<pre>
+=== Flush ===
+Return Code: {flush.returncode}
+Stdout: {flush.stdout}
+Stderr: {flush.stderr}
+
+=== Add ===
+Return Code: {add.returncode}
+Stdout: {add.stdout}
+Stderr: {add.stderr}
+
+=== Up ===
+Return Code: {up.returncode}
+Stdout: {up.stdout}
+Stderr: {up.stderr}
+
+=== Final IP Output ===
+{subprocess.getoutput("ip addr show eth1")}
+</pre>
+"""
+        return output
+    except Exception as e:
+        return f"<pre>Error: {str(e)}</pre>"
